@@ -1,18 +1,35 @@
 {
   "name": "nightwatch-plugin-postdoc",
   "version": "0.1.0",
-  "description": "",
+  "description": "Nightwatch plugin for testing PostDoc websites: page tests, a ready signal and an accessibility command.",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "lib",
+    "nightwatch",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
-    "test": ""
+    "test": "node --test test/*.test.js"
   },
-  "keywords": [],
+  "keywords": [
+    "nightwatch",
+    "nightwatch-plugin",
+    "postdoc",
+    "testing",
+    "accessibility"
+  ],
   "author": "Andrei Rusu",
   "license": "MIT",
-  "peerDependencies": {
-    "vite": "^4.5.1"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PostDocJS/nightwatch-plugin-postdoc.git"
   },
-  "dependencies": {
-    "nightwatch": "^3.3.5"
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "nightwatch": "^3.15.0"
   }
 }

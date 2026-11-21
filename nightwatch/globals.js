@@ -1,47 +1,68 @@
-const {spawn} = require('child_process');
-const createProcess = require('../lib/createProcess.js');
+const {existsSync} = require('node:fs');
+const path = require('node:path');
 
-const isWinPlatform = process.platform === 'win32';
-let postdocProcess = null;
-let postdocPid = null;
+const {PAGES_PATH_VARIABLE, resolvePagesPath} = require('../lib/pages.js');
+const {startPostDocServer, stopPostDocServer} = require('../lib/postdocServer.js');
 
-const endProcess = function () {
-  if (!postdocPid) {
+// The address of the site under test. `postdoc test` sets it when it serves the build;
+// otherwise the plugin starts the dev server and sets it.
+const BASE_URL_VARIABLE = 'POSTDOC_BASE_URL';
+
+let server = null;
+
+// Page tests are page objects too, so their folder is added to the page objects.
+function registerPageTests(settings) {
+  const pagesPath = resolvePagesPath(settings);
+
+  // The transform and parallel workers read the folder from here.
+  process.env[PAGES_PATH_VARIABLE] = pagesPath;
+
+  if (!existsSync(pagesPath)) {
     return;
   }
 
-  if (isWinPlatform) {
-    spawn('taskkill', ['/pid', postdocPid, '/f', '/t']);
+  const pageObjectPaths = [].concat(settings.page_objects_path ?? []);
 
-    return;
+  if (!pageObjectPaths.some((pageObjectPath) => path.resolve(pageObjectPath) === pagesPath)) {
+    settings.page_objects_path = [...pageObjectPaths, pagesPath];
   }
+}
 
-  process.kill(postdocPid);
-};
+function useSiteAddress(settings) {
+  const baseUrl = process.env[BASE_URL_VARIABLE];
 
-const isWorker = process.argv.includes('--test-worker');
-const startServer = async function (settings = {}) {
-  const start_server = settings.postdoc?.start_server ?? true;
-
-  if (start_server) {
-    const childProcess = await createProcess();
-    postdocProcess = childProcess.postdocProcess;
-    postdocPid = childProcess.postdocProcess.pid;
-
-    console.log(`Postdoc dev server is running at ${childProcess.url} with pid: ${postdocPid}`);
-
-    return postdocPid;
+  if (baseUrl) {
+    settings.launch_url = baseUrl;
+    settings.launchUrl = baseUrl;
   }
-};
+}
 
 module.exports = {
+  // Runs once, in the main process.
   async before(settings) {
-    if (!settings.parallel_mode || settings.parallel_mode && !isWorker) {
-      await startServer.call(this, settings);
+    registerPageTests(settings);
+
+    if (!process.env[BASE_URL_VARIABLE] && settings.postdoc?.start_server !== false) {
+      server = await startPostDocServer();
+      process.env[BASE_URL_VARIABLE] = server.url;
+
+      process.stdout.write(`The PostDoc dev server is running at ${server.url}\n`);
     }
+
+    useSiteAddress(settings);
+  },
+
+  // Runs in each worker when tests run in parallel. Workers inherit the environment
+  // variables the main process set in before().
+  async beforeChildProcess(settings) {
+    registerPageTests(settings);
+    useSiteAddress(settings);
   },
 
   async after() {
-    endProcess();
+    if (server) {
+      stopPostDocServer(server);
+      server = null;
+    }
   }
 };
