@@ -33,6 +33,12 @@ module.exports = class RunA11yTestsCommand {
           });
           this.client.reporter.printA11yReport();
 
+          // Without runAssertions, a page with no violations would show "No assertions
+          // ran", as if nothing had been checked.
+          if (!violations?.length && !runAssertions) {
+            this.api.assert.ok(true, `No accessibility violations on ${page} (${passes?.length ?? 0} aXe rules passed)`);
+          }
+
           if (results.violations && results.violations.length > 0) {
             const ruleIds = violations.map((violation) => violation.id).join(', ');
             const err = new Error(
